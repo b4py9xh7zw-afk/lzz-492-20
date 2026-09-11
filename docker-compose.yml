@@ -1,0 +1,127 @@
+services:
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: scaffolding-mysql
+    restart: always
+    environment:
+      # 数据库root用户密码
+      MYSQL_ROOT_PASSWORD: root123456
+      # 数据库名称
+      MYSQL_DATABASE: scaffolding_db
+      # 数据库字符集，支持中文
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      # 暴露数据库端口（可选，用于外部连接）
+      - "3306:3306"
+    volumes:
+      # 数据库数据持久化
+      - mysql_data:/var/lib/mysql
+      # 初始化SQL脚本（自动执行，支持中文）
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command:
+      # 设置字符集，确保中文不乱码
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    networks:
+      - scaffolding-network
+    healthcheck:
+      # 健康检查，确保数据库启动完成
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务（Spring Boot）
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scaffolding-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Spring Boot 配置
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/scaffolding_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123456
+      # 文件上传路径（容器内路径）
+      FILE_UPLOAD_PATH: /app/uploads
+      FILE_UPLOAD_URL: http://localhost:3000/api/files
+    ports:
+      # 后端服务端口
+      - "8088:8088"
+    volumes:
+      # 文件上传目录持久化
+      - backend_uploads:/app/uploads
+    networks:
+      - scaffolding-network
+    healthcheck:
+      # 健康检查
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8088/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # 前端构建服务（临时，仅用于构建）
+  frontend-builder:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: scaffolding-frontend-builder
+    volumes:
+      # 将构建产物挂载出来
+      - frontend_dist:/output
+    # 使用构建入口脚本复制构建产物到数据卷
+    entrypoint: ["/bin/sh"]
+    command: ["/app/build-entrypoint.sh"]
+
+  # Nginx 服务（前端静态文件 + 反向代理）
+  nginx:
+    image: nginx:alpine
+    container_name: scaffolding-nginx
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend-builder:
+        condition: service_completed_successfully
+    ports:
+      # 前端访问端口（3000端口）
+      - "3000:3000"
+    volumes:
+      # Nginx 配置文件
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # 前端构建产物
+      - frontend_dist:/usr/share/nginx/html:ro
+    networks:
+      - scaffolding-network
+    healthcheck:
+      # 健康检查
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# 数据卷定义（持久化存储）
+volumes:
+  # MySQL 数据卷
+  mysql_data:
+    driver: local
+  # 后端文件上传目录
+  backend_uploads:
+    driver: local
+  # 前端构建产物
+  frontend_dist:
+    driver: local
+
+# 网络定义（服务间通信）
+networks:
+  scaffolding-network:
+    driver: bridge

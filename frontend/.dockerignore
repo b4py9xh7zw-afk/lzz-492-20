@@ -1,0 +1,33 @@
+# 依赖目录
+node_modules/
+
+# 构建文件
+dist/
+.vite/
+
+# IDE 文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Git 文件
+.git/
+.gitignore
+
+# 文档
+README.md
+*.md
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
