@@ -1,88 +1,35 @@
+-- =====================================================================
+-- 蓝领招聘排班平台 - 工伤上报材料包  DDL / 演示数据
+-- 依赖 init.sql 中已有的 user 表；可重复执行（先 DROP 再 CREATE）
+-- 字符集：utf8mb4
+-- =====================================================================
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
-
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS `scaffolding_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
 USE `scaffolding_db`;
 
--- 文件信息表
-DROP TABLE IF EXISTS `file_info`;
-CREATE TABLE `file_info` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `file_name` varchar(255) NOT NULL COMMENT '文件名称',
-  `original_name` varchar(255) NOT NULL COMMENT '原始文件名',
-  `file_path` varchar(500) NOT NULL COMMENT '文件路径',
-  `file_size` bigint(20) DEFAULT '0' COMMENT '文件大小（字节）',
-  `file_type` varchar(50) DEFAULT NULL COMMENT '文件类型',
-  `file_extension` varchar(20) DEFAULT NULL COMMENT '文件扩展名',
-  `upload_user_id` bigint(20) DEFAULT NULL COMMENT '上传人ID',
-  `upload_user_name` varchar(50) DEFAULT NULL COMMENT '上传人姓名',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) DEFAULT '0' COMMENT '逻辑删除标识（0-未删除，1-已删除）',
-  PRIMARY KEY (`id`),
-  KEY `idx_file_type` (`file_type`),
-  KEY `idx_upload_user_id` (`upload_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件信息表';
+-- ---------------------------------------------------------------------
+-- 1. user 表扩展：角色 + 所属项目（已存在库请改用 injury_upgrade.sql 做幂等升级）
+--    全新初始化直接使用 init.sql（已包含下列字段）
+-- ---------------------------------------------------------------------
+SET @ddl := (SELECT IF((SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='user' AND COLUMN_NAME='role')=0,
+  'ALTER TABLE `user` ADD COLUMN `role` varchar(20) DEFAULT ''admin'' COMMENT ''角色（admin/supervisor/labor/enterprise）'' AFTER `nickname`','SELECT 1'));
+PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := (SELECT IF((SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='user' AND COLUMN_NAME='phone')=0,
+  'ALTER TABLE `user` ADD COLUMN `phone` varchar(20) DEFAULT NULL COMMENT ''联系电话'' AFTER `role`','SELECT 1'));
+PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := (SELECT IF((SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='user' AND COLUMN_NAME='project_id')=0,
+  'ALTER TABLE `user` ADD COLUMN `project_id` bigint(20) DEFAULT NULL COMMENT ''所属项目ID'' AFTER `phone`','SELECT 1'));
+PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := (SELECT IF((SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='user' AND COLUMN_NAME='company_name')=0,
+  'ALTER TABLE `user` ADD COLUMN `company_name` varchar(100) DEFAULT NULL COMMENT ''劳务公司名称'' AFTER `project_id`','SELECT 1'));
+PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
 
--- 工作管理表
-DROP TABLE IF EXISTS `work`;
-CREATE TABLE `work` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `work_name` varchar(100) NOT NULL COMMENT '工作名称',
-  `work_content` text COMMENT '工作内容',
-  `work_status` varchar(20) DEFAULT 'pending' COMMENT '工作状态（pending-待处理，in_progress-进行中，completed-已完成，cancelled-已取消）',
-  `work_time` datetime DEFAULT NULL COMMENT '工作时间',
-  `start_time` datetime DEFAULT NULL COMMENT '开始时间',
-  `end_time` datetime DEFAULT NULL COMMENT '结束时间',
-  `priority` varchar(20) DEFAULT 'normal' COMMENT '优先级（low-低，normal-普通，high-高，urgent-紧急）',
-  `remark` varchar(500) DEFAULT NULL COMMENT '备注',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) DEFAULT '0' COMMENT '逻辑删除标识（0-未删除，1-已删除）',
-  PRIMARY KEY (`id`),
-  KEY `idx_work_status` (`work_status`),
-  KEY `idx_work_time` (`work_time`),
-  KEY `idx_priority` (`priority`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工作管理表';
-
--- 用户表
-DROP TABLE IF EXISTS `user`;
-CREATE TABLE `user` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `username` varchar(50) NOT NULL COMMENT '用户名（账号）',
-  `password` varchar(100) NOT NULL COMMENT '密码（不加密）',
-  `nickname` varchar(50) DEFAULT NULL COMMENT '昵称',
-  `role` varchar(20) DEFAULT 'admin' COMMENT '角色（admin-平台管理员，supervisor-现场主管，labor-劳务公司，enterprise-用工企业）',
-  `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
-  `project_id` bigint(20) DEFAULT NULL COMMENT '所属项目ID（主管/企业绑定单个项目）',
-  `company_name` varchar(100) DEFAULT NULL COMMENT '所属公司名称（劳务公司账号）',
-  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) DEFAULT '0' COMMENT '逻辑删除标识（0-未删除，1-已删除）',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_username` (`username`),
-  KEY `idx_username` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
-
--- 插入默认admin账号
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`) VALUES ('admin', '123456', '管理员', 'admin');
-
--- =====================================================================
--- 工伤上报材料包：项目/工人/排班档案/工伤上报/见证人/材料/保险/档案事件
--- =====================================================================
--- 演示账号（已存在同名账号则跳过；需在引用其 id 的业务种子之前插入）
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
-SELECT 'supervisor1','123456','刘主管','supervisor','13900000001',1,NULL FROM DUAL
- WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='supervisor1');
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
-SELECT 'labor1','123456','安达劳务-陈经办','labor','13900000002',NULL,'安达劳务派遣有限公司' FROM DUAL
- WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='labor1');
-INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
-SELECT 'enterprise1','123456','华东建工-安全科','enterprise','13900000003',1,NULL FROM DUAL
- WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='enterprise1');
-
+-- ---------------------------------------------------------------------
+-- 2. 项目表（企业发包、劳务派人、主管现场管理的最小单位）
+-- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS `project`;
 CREATE TABLE `project` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -307,6 +254,15 @@ INSERT INTO `schedule` (`id`, `project_id`, `worker_id`, `post_name`, `shift`, `
 
 -- 角色账号：主管 / 劳务 / 企业（admin 仍为 admin/123456）
 UPDATE `user` SET `role` = 'admin' WHERE `username` = 'admin';
+INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
+SELECT 'supervisor1','123456','刘主管','supervisor','13900000001',1,NULL FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='supervisor1');
+INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
+SELECT 'labor1','123456','安达劳务-陈经办','labor','13900000002',NULL,'安达劳务派遣有限公司' FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='labor1');
+INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `phone`, `project_id`, `company_name`)
+SELECT 'enterprise1','123456','华东建工-安全科','enterprise','13900000003',1,NULL FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM `user` u WHERE u.username='enterprise1');
 
 -- 工伤上报单：单1已上报但缺保险/合同等材料；单2为草稿演示缺件提示
 INSERT INTO `injury_report`
@@ -355,6 +311,3 @@ INSERT INTO `schedule_event`
 (`schedule_id`, `report_id`, `event_type`, `event_content`, `operator_id`, `operator_name`, `event_time`) VALUES
 (1, 1, 'injury_report', '主管手机端上报工伤：6层外架踩空，左手腕骨折，送上海市第七人民医院。', (SELECT id FROM `user` WHERE username='supervisor1'), '刘主管', '2026-09-10 11:20:00'),
 (1, 1, 'injury_stop', '医疗诊断左桡骨远端骨折，医嘱制动休息6周，自2026-09-10起停工，预计2026-10-22复诊评估复工。', (SELECT id FROM `user` WHERE username='supervisor1'), '刘主管', '2026-09-10 16:00:00');
-
-
-SET FOREIGN_KEY_CHECKS = 1;

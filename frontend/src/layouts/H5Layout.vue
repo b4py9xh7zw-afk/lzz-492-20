@@ -17,6 +17,8 @@
     </div>
     <van-tabbar v-model="activeTab" route fixed placeholder>
       <van-tabbar-item icon="photo-o" to="/h5/file">文件</van-tabbar-item>
+      <van-tabbar-item icon="warning-o" to="/h5/injury">工伤</van-tabbar-item>
+      <van-tabbar-item icon="calendar-o" to="/h5/schedule">排班</van-tabbar-item>
       <van-tabbar-item icon="orders-o" to="/h5/work">工作</van-tabbar-item>
       <van-tabbar-item icon="user-o" to="/h5/user">用户</van-tabbar-item>
     </van-tabbar>
@@ -32,12 +34,19 @@ const router = useRouter()
 const activeTab = ref(0)
 
 const navTitle = computed(() => {
+  const p = route.path
+  if (p.startsWith('/h5/injury')) {
+    if (p.includes('/create')) return '现场工伤上报'
+    if (/\d+$/.test(p)) return '工伤上报详情'
+    return '工伤上报'
+  }
+  if (p.startsWith('/h5/schedule')) return '排班档案'
   const titles = {
     '/h5/file': '文件管理',
     '/h5/work': '工作管理',
     '/h5/user': '用户管理'
   }
-  return titles[route.path] || '工作管理系统'
+  return titles[p] || '蓝领招聘排班平台'
 })
 
 const switchToPC = () => {

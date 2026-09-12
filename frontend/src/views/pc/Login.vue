@@ -28,10 +28,12 @@
           />
         </el-form-item>
         
-        <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-          <p class="text-sm text-gray-600 mb-2">测试账号：</p>
-          <p class="text-sm text-gray-700">账号：<span class="font-semibold">admin</span></p>
-          <p class="text-sm text-gray-700">密码：<span class="font-semibold">123456</span></p>
+        <div class="mb-4 p-3 bg-blue-50 rounded-lg mt-4">
+          <p class="text-sm text-gray-600 mb-2">测试账号（密码均为 123456）：</p>
+          <p class="text-sm text-gray-700">主管：<span class="font-semibold">supervisor1</span>（手机端上报/结论）</p>
+          <p class="text-sm text-gray-700">劳务：<span class="font-semibold">labor1</span>（补充保险资料）</p>
+          <p class="text-sm text-gray-700">企业：<span class="font-semibold">enterprise1</span>（仅查看本项目）</p>
+          <p class="text-sm text-gray-700">管理员：<span class="font-semibold">admin</span></p>
         </div>
         
         <el-form-item>
@@ -87,7 +89,7 @@ const handleLogin = async () => {
           // 保存用户信息到localStorage
           localStorage.setItem('user', JSON.stringify(res.data))
           // 跳转到文件管理页面
-          router.push('/pc/file')
+          router.push('/pc/injury')
         }
       } catch (error) {
         console.error(error)

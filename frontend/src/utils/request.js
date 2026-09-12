@@ -13,11 +13,18 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   config => {
-    // 可以在这里添加token等
-    // const token = localStorage.getItem('token')
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+    // 工伤模块按 X-User-Id 识别登录身份（与后端 LoginInterceptor 约定）
+    try {
+      const raw = localStorage.getItem('user')
+      if (raw) {
+        const user = JSON.parse(raw)
+        if (user && user.id) {
+          config.headers['X-User-Id'] = user.id
+        }
+      }
+    } catch (e) {
+      // ignore parse error
+    }
     return config
   },
   error => {
